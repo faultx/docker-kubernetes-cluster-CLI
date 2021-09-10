@@ -1,0 +1,68 @@
+# Centos 7 Udpate Edilir 
+yum update -y 
+
+# Master Node için Hostname ve IP Adresi ayarı yapılır.
+nmtuı
+
+# HOSTS Dosyası içine bakılır ve Gerekli IP ve Node Bilgileri Eklenir.
+cat /etc/hosts
+
+nano /etc/hosts ( Nano Editör Yoksa yum install -y ) 
+# Satırları ekle
+192.168.1.10 master-node
+192.168.1.11 node-1 worker-node-1
+192.168.1.12 node-2 worker-node-2
+
+# Kontrol
+cat /etc/hosts
+
+# Kuberntes için Cluster için Bağlantı Kontorlü
+pıng 192.168.1.11 and 192.168.1.12
+
+# SELinux Kapatılır
+setenforce 0
+sed -i --follow-symlinks 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/sysconfig/selinux
+
+
+# Bir kere ayarlar algılansın diye Reboot edilir.
+reboot
+
+# Gerekli olan Firewall ayarları yapılır.
+firewall-cmd --permanent --add-port=6783/tcp
+firewall-cmd --permanent --add-port=10250/tcp
+firewall-cmd --permanent --add-port=10255/tcp
+firewall-cmd --permanent --add-port=30000-32767/tcp
+firewall-cmd  --reload
+modprobe br_netfilter
+echo '1' > /proc/sys/net/bridge/bridge-nf-call-iptables
+
+#Kubernetes Repo Hazırlamak Defult olarak Centos 7 de gelmez 
+nano /etc/yum.repos.d/kubernetes.repo
+
+# Satırları ekle
+[kubernetes]
+name=Kubernetes
+baseurl=https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64
+enabled=1
+gpgcheck=1
+repo_gpgcheck=1
+gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+
+# Docker ve Kubernetes Kurulumu 
+yum install kubeadm docker -y 
+
+# Kuberntes ve Docker Centos Açılışına Ekleme
+systemctl enable kubelet
+systemctl start kubelet
+systemctl enable docker
+systemctl start docker
+
+# Kubnerntes Ayarlarına Devam
+swapoff -a
+sed -ri '/\sswap\s/s/^#?/#/' /etc/fstab
+
+#Cluster' e Joın Etme
+kubeadm join 192.168.1.10:6443 --token jo4598.xffwx35rnw3gur18 --discovery-token-ca-cert-hash sha256:925facd694be162b0864fefc4ef99de037d1f46e41b6db4d7bbab1291e47663d 
+
+#Kontrol
+kubectl get nodes

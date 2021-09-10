@@ -1,0 +1,93 @@
+# Centos 7 Udpate Edilir 
+yum update -y 
+
+# Master Node için Hostname ve IP Adresi ayarı yapılır.
+nmtui
+
+# HOSTS Dosyası içine bakılır ve Gerekli IP ve Node Bilgileri Eklenir.
+cat /etc/hosts
+
+nano /etc/hosts ( Nano Editör Yoksa yum install -y ) 
+# Satırları ekle
+192.168.14.16 kmasterMaster
+192.168.14.17 node-1 kWorker1
+192.168.14.18 node-2 kWorker2
+# Kontrol
+cat /etc/hosts
+
+# Kuberntes için Cluster için Bağlantı Kontorlü
+ping 192.168.14.17 and 192.168.14.18
+
+# SELinux Kapatılır
+setenforce 0
+sed -i --follow-symlinks 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/sysconfig/selinux
+
+# Bir kere ayarlar algılansın diye Reboot edilir.
+reboot
+
+
+# Gerekli olan Firewall ayarları yapılır.
+firewall-cmd --permanent --add-port=6443/tcp
+firewall-cmd --permanent --add-port=2379-2380/tcp
+firewall-cmd --permanent --add-port=10250/tcp
+firewall-cmd --permanent --add-port=10251/tcp
+firewall-cmd --permanent --add-port=10252/tcp
+firewall-cmd --permanent --add-port=10255/tcp
+firewall-cmd  --reload
+
+modprobe br_netfilter
+echo '1' > /proc/sys/net/bridge/bridge-nf-call-iptables
+
+## Eger Fıreeall kullanılmayacaksa Komple Disable Edılebilir
+systemctl stop firewalld
+systemctl disable firewalld
+
+# Kubernetes Repo Hazırlamak Defult olarak Centos 7 de gelmez 
+nano /etc/yum.repos.d/kubernetes.repo
+
+# Satırları ekle
+[kubernetes]
+name=Kubernetes
+baseurl=https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64
+enabled=1
+gpgcheck=1
+repo_gpgcheck=1
+gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+
+# Docker ve Kubernetes Kurulumu 
+yum install kubeadm docker -y 
+
+# Kuberntes ve Docker Centos Açılışına Ekleme
+systemctl enable kubelet
+systemctl start kubelet
+systemctl enable docker
+systemctl start docker
+
+# Kubnerntes Ayarlarına Devam
+swapoff -a
+sed -ri '/\sswap\s/s/^#?/#/' /etc/fstab
+
+#Kubernetes Başlatma 
+kubeadm init
+
+# Kubernetes Inıt sonrası en altta çıkan TOKEN bilgisini kayıt ediniz size gerekli olacak.
+## Then you can join any number of worker nodes by running the following on each as root:
+   kubeadm join 192.168.1.10:6443 --token jo4598.xffwx35rnw3gur18 \ ( Buradakı "\" işeretini silip işlem yapmanzı gerekiyor. ) 
+    --discovery-token-ca-cert-hash sha256:925facd694be162b0864fefc4ef99de037d1f46e41b6db4d7bbab1291e47663d 
+
+## kubeadm join 192.168.14.16:6443 --token 175ht7.82ocqod7of7jwvlm --discovery-token-ca-cert-hash sha256:63f53d2638a38490c57088913a4a95acf3d044922f1508a079e81823b8e3ce69 ##
+
+# Kubnernetes Ayarlarına Devam 2 
+mkdir -p $HOME/.kube
+cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+chown $(id -u):$(id -g) $HOME/.kube/config
+export kubever=$(kubectl version | base64 | tr -d '\n')
+kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$kubever"
+
+# Kontrol 
+kubectl get nodes
+
+# Master Node Bitti 
+
+
+
